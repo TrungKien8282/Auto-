@@ -1,0 +1,150 @@
+local partNames = {
+    "quartz",
+    "albite",
+    "chroma_contaris",
+    "musgravite",
+    "aegirine",
+    "black_diamond"
+}
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- GUI chính
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "BringPartGUI"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = PlayerGui
+
+-- Nút đóng mở
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 80, 0, 28)
+toggleButton.Position = UDim2.new(1, -100, 0, 40)
+toggleButton.AnchorPoint = Vector2.new(0, 0)
+toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.TextSize = 14
+toggleButton.Text = "Open"
+toggleButton.BorderSizePixel = 0
+toggleButton.Parent = screenGui
+Instance.new("UICorner", toggleButton).CornerRadius = UDim.new(0, 6)
+
+-- Frame chứa nút
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 160, 0, (#partNames + 1) * 32 + 10 + 32)
+frame.Position = UDim2.new(0, 20, 0.5, -((#partNames * 32 + 10)/2))
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Visible = false
+frame.Active = true
+frame.Parent = screenGui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+
+-- Kéo gui (mobile + PC)
+local UIS = game:GetService("UserInputService")
+local dragging, dragStart, startPos = false
+
+local function updateInput(input)
+	local delta = input.Position - dragStart
+	frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = frame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then dragging = false end
+		end)
+	end
+end)
+
+frame.InputChanged:Connect(function(input)
+	if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
+		updateInput(input)
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
+		updateInput(input)
+	end
+end)
+
+-- Toggle hiển thị GUI
+toggleButton.MouseButton1Click:Connect(function()
+	frame.Visible = not frame.Visible
+	toggleButton.Text = frame.Visible and "Close" or "Open"
+end)
+
+-- Bring part đến bên cạnh nhân vật
+local function bringPart(name)
+	local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	for _, obj in pairs(workspace:GetDescendants()) do
+		if obj:IsA("BasePart") and obj.Name == name then
+			obj.CFrame = hrp.CFrame + Vector3.new(3, 0, 0)
+		end
+	end
+end
+
+-- Nút bring từng part
+for i, name in ipairs(partNames) do
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, -20, 0, 26)
+	btn.Position = UDim2.new(0, 10, 0, (i - 1) * 32 + 5)
+	btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 14
+	btn.Text = "Bring " .. name
+	btn.Parent = frame
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+	btn.MouseButton1Click:Connect(function()
+		bringPart(name)
+	end)
+end
+
+-- Nút Server Hop
+local hopButton = Instance.new("TextButton")
+hopButton.Size = UDim2.new(1, -20, 0, 26)
+hopButton.Position = UDim2.new(0, 10, 0, #partNames * 32 + 10)
+hopButton.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
+hopButton.TextColor3 = Color3.new(1, 1, 1)
+hopButton.Font = Enum.Font.GothamBold
+hopButton.TextSize = 14
+hopButton.Text = "Server Hop"
+hopButton.Parent = frame
+Instance.new("UICorner", hopButton).CornerRadius = UDim.new(0, 6)
+
+-- Logic server hop
+hopButton.MouseButton1Click:Connect(function()
+	local servers = {}
+	local success, response = pcall(function()
+		return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100"))
+	end)
+
+	if success and response and response.data then
+		for _, server in ipairs(response.data) do
+			if server.playing < server.maxPlayers and server.id ~= game.JobId then
+				table.insert(servers, server.id)
+			end
+		end
+	end
+
+	if #servers > 0 then
+		local randomServer = servers[math.random(1, #servers)]
+		TeleportService:TeleportToPlaceInstance(game.PlaceId, randomServer, LocalPlayer)
+	else
+		warn("No other servers available!")
+	end
+end)
