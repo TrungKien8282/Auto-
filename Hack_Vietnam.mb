@@ -1,0 +1,131 @@
+-- BringPart GUI – Drag support for PC & Mobile, Monochrome UI
+
+local partNames = {
+    "quartz",
+    "albite",
+    "chroma_contaris",
+    "musgravite",
+    "aegirine",
+    "black_diamond"
+}
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- GUI chính
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "BringPartGUI"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = PlayerGui
+
+-- Toggle Button
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 80, 0, 28)
+toggleButton.Position = UDim2.new(1, -100, 0, 40)
+toggleButton.AnchorPoint = Vector2.new(0, 0)
+toggleButton.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.Font = Enum.Font.GothamBold
+toggleButton.TextSize = 14
+toggleButton.Text = "Open"
+toggleButton.BorderSizePixel = 0
+toggleButton.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 6)
+corner.Parent = toggleButton
+
+-- Frame chứa các nút
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 160, 0, #partNames * 32 + 10)
+frame.Position = UDim2.new(0, 20, 0.5, -((#partNames * 32 + 10)/2))
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BorderSizePixel = 0
+frame.Visible = false
+frame.Active = true
+frame.Draggable = false -- Không dùng Draggable cũ
+frame.Parent = screenGui
+
+local frameCorner = Instance.new("UICorner")
+frameCorner.CornerRadius = UDim.new(0, 10)
+frameCorner.Parent = frame
+
+-- Drag support for PC & Mobile
+local UIS = game:GetService("UserInputService")
+local dragging = false
+local dragStart, startPos
+
+local function updateInput(input)
+	local delta = input.Position - dragStart
+	frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+frame.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = frame.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+frame.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		if dragging then
+			updateInput(input)
+		end
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
+		updateInput(input)
+	end
+end)
+
+-- Toggle GUI
+toggleButton.MouseButton1Click:Connect(function()
+	frame.Visible = not frame.Visible
+	toggleButton.Text = frame.Visible and "Close" or "Open"
+end)
+
+-- Bring part lại một chỗ gần nhân vật
+local function bringPartTogether(partName)
+	local HRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if not HRP then return end
+
+	for _, obj in pairs(workspace:GetDescendants()) do
+		if obj:IsA("BasePart") and obj.Name == partName then
+			obj.CFrame = HRP.CFrame + Vector3.new(3, 0, 0)
+		end
+	end
+end
+
+-- Tạo nút cho từng đá quý
+for i, name in ipairs(partNames) do
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -20, 0, 26)
+	button.Position = UDim2.new(0, 10, 0, (i - 1) * 32 + 5)
+	button.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.Font = Enum.Font.GothamBold
+	button.TextSize = 14
+	button.Text = "Bring " .. name
+	button.AutoButtonColor = true
+	button.Parent = frame
+
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 6)
+	btnCorner.Parent = button
+
+	button.MouseButton1Click:Connect(function()
+		bringPartTogether(name)
+	end)
+end
