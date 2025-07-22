@@ -1,0 +1,104 @@
+repeat wait() until game:IsLoaded()
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
+
+-- 🔁 Luôn cập nhật lại HumanoidRootPart khi nhân vật chết & respawn
+local function getRootPart()
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    return character:WaitForChild("HumanoidRootPart")
+end
+
+-- 📌 TPA đến GameStart đầu tiên
+local function teleportToFirstGameStart()
+    local utility = workspace:FindFirstChild("Utility")
+    if utility then
+        local obbyColliders = utility:FindFirstChild("ObbyColliders")
+        if obbyColliders then
+            for _, part in ipairs(obbyColliders:GetChildren()) do
+                if part:IsA("BasePart") and part.Name == "GameStart" then
+                    getRootPart().CFrame = part.CFrame + Vector3.new(0, 3, 0)
+                    wait(1)
+                    break
+                end
+            end
+        end
+    end
+end
+
+-- ✅ TPA đến các Default
+local function teleportToDefaults()
+    local pickups = workspace:FindFirstChild("Pickups") or workspace:FindFirstChild("ActivePickups")
+    if pickups then
+        for _, v in ipairs(pickups:GetChildren()) do
+            if v:IsA("BasePart") and v.Name == "Default" then
+                getRootPart().CFrame = v.CFrame + Vector3.new(0, 3, 0)
+                wait(0.3)
+            end
+        end
+    end
+end
+
+-- ✅ Kiểm tra còn Default
+local function isDefaultRemaining()
+    local pickups = workspace:FindFirstChild("Pickups") or workspace:FindFirstChild("ActivePickups")
+    if pickups then
+        for _, v in ipairs(pickups:GetChildren()) do
+            if v:IsA("BasePart") and v.Name == "Default" then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- ✅ TPA đến StopGame
+local function teleportToStopGame()
+    local utility = workspace:FindFirstChild("Utility")
+    if utility then
+        local obbyColliders = utility:FindFirstChild("ObbyColliders")
+        if obbyColliders then
+            for _, part in ipairs(obbyColliders:GetChildren()) do
+                if part:IsA("BasePart") and part.Name == "StopGame" then
+                    getRootPart().CFrame = part.CFrame + Vector3.new(0, 3, 0)
+                    wait(1)
+                    break
+                end
+            end
+        end
+    end
+end
+
+-- 🔁 Serverhop
+local function serverHop()
+    local success, result = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"))
+    end)
+    if success and result and result.data then
+        for _, server in pairs(result.data) do
+            if server.playing < server.maxPlayers and server.id ~= game.JobId then
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id)
+                break
+            end
+        end
+    end
+end
+
+-- ▶️ Bắt đầu tự động
+task.spawn(function()
+    teleportToFirstGameStart()
+
+    while true do
+        if isDefaultRemaining() then
+            teleportToDefaults()
+        else
+            wait(87) -- ⏳ Chờ 87 giây sau khi nhặt hết Default
+            teleportToStopGame()
+            serverHop()
+            break
+        end
+        wait(0.5)
+    end
+end)
